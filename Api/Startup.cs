@@ -15,6 +15,7 @@ using MinimalApi.Dominio.ModelViews;
 using MinimalApi.Dominio.Servicos;
 using MinimalApi.DTOs;
 using MinimalApi.Infraestrutura.Db;
+using OfficeOpenXml;
 
 public class Startup
 {
@@ -391,6 +392,44 @@ public class Startup
             })
             .RequireAuthorization()
             .RequireAuthorization(new AuthorizeAttribute { Roles = "Adm" })
+            .WithTags("Veiculos");
+
+            endpoints.MapGet("/veiculos/export", async (IVeiculoServico veiculoServico) =>
+            {
+                var veiculos = veiculoServico.Todos();
+                ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+
+                using var pacote = new ExcelPackage();
+                var planilha = pacote.Workbook.Worksheets.Add("Veículos");
+
+                // Cabeçalhos
+                planilha.Cells[1, 1].Value = "ID";
+                planilha.Cells[1, 2].Value = "Nome";
+                planilha.Cells[1, 3].Value = "Marca";
+                planilha.Cells[1, 4].Value = "Ano";
+
+                // Dados
+                for (int i = 0; i < veiculos.Count; i++)
+                {
+                    var v = veiculos[i];
+                    planilha.Cells[i + 2, 1].Value = v.Id;
+                    planilha.Cells[i + 2, 2].Value = v.Nome;
+                    planilha.Cells[i + 2, 3].Value = v.Marca;
+                    planilha.Cells[i + 2, 4].Value = v.Ano;
+                }
+
+                // Auto-ajuste de colunas
+                planilha.Cells[planilha.Dimension.Address].AutoFitColumns();
+
+                var arquivoBytes = pacote.GetAsByteArray();
+
+                return Results.File(
+                    fileContents: arquivoBytes,
+                    contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    fileDownloadName: $"veiculos_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx"
+                );
+            })
+            .RequireAuthorization(new AuthorizeAttribute { Roles = "Adm,Editor" })
             .WithTags("Veiculos");
             #endregion
         });
