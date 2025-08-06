@@ -211,6 +211,63 @@ public class Startup
             .RequireAuthorization()
             .RequireAuthorization(new AuthorizeAttribute { Roles = "Adm" })
             .WithTags("Administradores");
+
+            endpoints.MapPost("/administradores/bulk", (
+                [FromBody] List<AdministradorDTO> administradoresDTO,
+                IAdministradorServico administradorServico) =>
+            {
+                var validacoes = new List<ErrosDeValidacao>();
+                var administradoresCriados = new List<AdministradorModelView>();
+
+                foreach (var administradorDTO in administradoresDTO)
+                {
+                    var erros = new ErrosDeValidacao
+                    {
+                        Mensagens = new List<string>()
+                    };
+
+                    if (string.IsNullOrEmpty(administradorDTO.Email))
+                        erros.Mensagens.Add("Email não pode ser vazio");
+                    if (string.IsNullOrEmpty(administradorDTO.Senha))
+                        erros.Mensagens.Add("Senha não pode ser vazia");
+                    if (administradorDTO.Perfil == null)
+                        erros.Mensagens.Add("Perfil não pode ser vazio");
+
+                    if (erros.Mensagens.Count > 0)
+                    {
+                        erros.Mensagens.Insert(0, $"Erro no administrador com email: {administradorDTO.Email}");
+                        validacoes.Add(erros);
+                        continue;
+                    }
+
+                    var administrador = new Administrador
+                    {
+                        Email = administradorDTO.Email,
+                        Senha = administradorDTO.Senha,
+                        Perfil = administradorDTO.Perfil.ToString() ?? Perfil.Editor.ToString()
+                    };
+
+                    administradorServico.Incluir(administrador);
+
+                    administradoresCriados.Add(new AdministradorModelView
+                    {
+                        Id = administrador.Id,
+                        Email = administrador.Email,
+                        Perfil = administrador.Perfil
+                    });
+                }
+
+                if (validacoes.Any())
+                {
+                    return Results.BadRequest(validacoes);
+                }
+
+                return Results.Created("/administradores/bulk", administradoresCriados);
+            })
+            .RequireAuthorization(new AuthorizeAttribute { Roles = "Adm" })
+            .WithTags("Administradores");
+
+            
             #endregion
 
             #region Veiculos
@@ -249,6 +306,45 @@ public class Startup
             .RequireAuthorization()
             .RequireAuthorization(new AuthorizeAttribute { Roles = "Adm,Editor" })
             .WithTags("Veiculos");
+
+            endpoints.MapPost("/veiculos/bulk", (
+                [FromBody] List<VeiculoDTO> veiculosDTO,
+                IVeiculoServico veiculoServico) =>
+            {
+                var veiculosCriados = new List<Veiculo>();
+                var erros = new List<object>();
+
+                foreach (var veiculoDTO in veiculosDTO)
+                {
+                    var validacao = validaDTO(veiculoDTO);
+                    if (validacao.Mensagens.Count > 0)
+                    {
+                        erros.Add(new {
+                            Veiculo = veiculoDTO,
+                            Erros = validacao.Mensagens
+                        });
+                        continue;
+                    }
+
+                    var veiculo = new Veiculo
+                    {
+                        Nome = veiculoDTO.Nome,
+                        Marca = veiculoDTO.Marca,
+                        Ano = veiculoDTO.Ano
+                    };
+
+                    veiculoServico.Incluir(veiculo);
+                    veiculosCriados.Add(veiculo);
+                }
+
+                if (erros.Any())
+                    return Results.BadRequest(new { Erros = erros });
+
+                return Results.Created("/veiculos/bulk", veiculosCriados);
+            })
+            .RequireAuthorization(new AuthorizeAttribute { Roles = "Adm,Editor" })
+            .WithTags("Veiculos");
+
 
             endpoints.MapGet("/veiculos", ([FromQuery] int? pagina, IVeiculoServico veiculoServico) => {
                 var veiculos = veiculoServico.Todos(pagina);
