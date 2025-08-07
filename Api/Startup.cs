@@ -347,11 +347,18 @@ public class Startup
             .WithTags("Veiculos");
 
 
-            endpoints.MapGet("/veiculos", ([FromQuery] int? pagina, IVeiculoServico veiculoServico) => {
-                var veiculos = veiculoServico.Todos(pagina);
-
+            endpoints.MapGet("/veiculos", (
+                [FromQuery] int? pagina,
+                [FromQuery] string? nome,
+                [FromQuery] string? marca,
+                [FromQuery] int? ano,
+                IVeiculoServico veiculoServico) =>
+            {
+                var veiculos = veiculoServico.Todos(pagina, nome, marca, ano);
                 return Results.Ok(veiculos);
-            }).RequireAuthorization().WithTags("Veiculos");
+            })
+            .RequireAuthorization()
+            .WithTags("Veiculos");
 
             endpoints.MapGet("/veiculos/{id}", ([FromRoute] int id, IVeiculoServico veiculoServico) => {
                 var veiculo = veiculoServico.BuscaPorId(id);
